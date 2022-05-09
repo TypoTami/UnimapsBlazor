@@ -1,0 +1,49 @@
+﻿@page "/roomdata"
+
+@using System.Net.Http
+@using System.Net.Http.Json
+@using System.Threading.Tasks
+@inject HttpClient Http
+
+<PageTitle>Rooms</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">Room Data</MudText>
+
+<MudTable Items="@_roomItems" Loading="@(_roomItems.Length == 0)" Hover="true">
+    <ColGroup>
+        <col />
+        <col />
+        <col />
+    </ColGroup>
+    <HeaderContent>
+        <MudTh>ID</MudTh>
+        <MudTh>Building</MudTh>
+        <MudTh>Room</MudTh>
+        <MudTh>Open</MudTh>
+        <MudTh>Closing Time</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="ID">@context.stringIdentifier</MudTd>
+        <MudTd DataLabel="Building">@context.building</MudTd>
+        <MudTd DataLabel="Room">@context.roomNumber</MudTd>
+        <MudTd DataLabel="Open">@context.open</MudTd>
+        <MudTd DataLabel="Closing Time">@context.closingTime</MudTd>
+    </RowTemplate>
+</MudTable>
+
+
+@code {
+    private Room[]? _roomItems = Array.Empty<Room>();
+
+    // Get rooms from Backend
+    protected override async Task OnInitializedAsync() => 
+        _roomItems = await Http.GetFromJsonAsync<Room[]>("http://localhost:5150/api/rooms/");    
+    
+    public class Room {
+        public string stringIdentifier { get; set; }
+        public string roomNumber { get; set; }
+        public string building { get; set; }
+        public bool open { get; set; }
+        public string closingTime { get; set; }
+    }
+}

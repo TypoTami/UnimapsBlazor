@@ -1,0 +1,51 @@
+﻿@page "/laptopdata"
+
+@using System.Net.Http
+@using System.Net.Http.Json
+@using System.Threading.Tasks
+@inject HttpClient Http
+
+<PageTitle>Laptops</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">Laptop Data</MudText>
+
+<MudTable Items="@_laptopItems" Loading="@(_laptopItems.Length == 0)" Hover="true">
+    <ColGroup>
+        <col />
+        <col />
+        <col style="width: 60%;" />
+    </ColGroup>
+    <HeaderContent>
+        <MudTh>Building</MudTh>
+        <MudTh>Location</MudTh>
+        <MudTh>Available</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Building">@context.building</MudTd>
+        <MudTd DataLabel="Location">@context.location</MudTd>
+        <MudTd DataLabel="Available">
+            <MudText Typo="Typo.caption">@context.available / @context.total</MudText>
+            <MudProgressLinear
+                Value="@context.available"
+                Min="0"
+                Max="@context.total"/>
+        </MudTd>
+    </RowTemplate>
+</MudTable>
+
+
+@code {
+    private Laptop[]? _laptopItems = Array.Empty<Laptop>();
+
+    // Get laptops from Backend
+    protected override async Task OnInitializedAsync() => 
+        _laptopItems = await Http.GetFromJsonAsync<Laptop[]>("http://localhost:5150/api/laptops/");    
+    
+    public class Laptop {
+        public Int32 time { get; set; }
+        public string building { get; set; }
+        public int total { get; set; }
+        public int available { get; set; }
+        public string location { get; set; }
+    }
+}

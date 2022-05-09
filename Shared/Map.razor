@@ -1,0 +1,173 @@
+@using Blazor.Extensions
+@using Blazor.Extensions.Canvas.Canvas2D
+@using System.Net.Http
+@using System.Net.Http.Json
+@using System.Threading.Tasks
+@inject HttpClient Http
+
+<MudPaper Elevation="1" Class="mud-info">
+    <BECanvas Width="400" Height="300" @ref="_canvasReference" ></BECanvas>
+
+    <MudPaper Elevation="25" Class="py-2">
+        <MudToolBar>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" @onclick=@GetPath>Find!</MudButton>
+
+            <MudSelect @bind-Value="startName" T="string" Label="Start" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" Class="px-4">
+                @foreach (Node node in _nodes)
+                {
+                    <MudSelectItem Value="@(node.RoomName)" />
+                }
+            </MudSelect>
+
+            <MudSelect @bind-Value="endName" T="string" Label="Destination" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" Class="px-4">
+                @foreach (Node node in _nodes)
+                {
+                    <MudSelectItem Value="@(node.RoomName)" />
+                }
+            </MudSelect>
+        </MudToolBar>
+
+        <MudText Class="py-2 px-4">@pathString</MudText>
+
+    </MudPaper>
+</MudPaper>
+
+@code {
+    private Node[]? _nodes = Array.Empty<Node>();
+    private Edge[]? _edge = Array.Empty<Edge>();
+
+    private string startName;
+    private string endName;
+
+    private string pathString = " ";
+
+    // Get the nodes and edges that make up our graph from the Backend
+    protected override async Task OnInitializedAsync() {
+        _nodes = await Http.GetFromJsonAsync<Node[]>("http://localhost:5150/api/graph/node/");
+        _edge = await Http.GetFromJsonAsync<Edge[]>("http://localhost:5150/api/graph/edge/");
+    }
+
+    public async void GetPath() {
+        // Get the ids from the names of the nodes that the user selected
+        int startId = getIdFromName(startName);
+        int endId = getIdFromName(endName);
+
+        // Ask the backend for the path between these two points
+        int[]? path = await Http.GetFromJsonAsync<int[]?>($"https://localhost:7257/api/graph/path?startId={startId}&endId={endId}");
+
+        pathString = "";
+
+        foreach (int n in path)
+        {
+            pathString += $"{getNodeFromId(n).RoomName} -> ";
+        }
+
+        pathString = pathString.Substring(0, pathString.Length-3);
+    }
+
+    private Canvas2DContext _context;
+
+    protected BECanvasComponent _canvasReference;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Set up HTML5 canvas for drawing
+        this._context = await this._canvasReference.CreateCanvas2DAsync();
+        await this._context.ClearRectAsync(0,0, _canvasReference.Width, _canvasReference.Height);
+
+        await this._context.SetFillStyleAsync("#AAAAAA");
+        await this._context.FillRectAsync(0,0,_canvasReference.Width, _canvasReference.Height);
+
+        // Draw the edges of the graph
+        foreach (Edge e in _edge) {
+            Node a = getNodeFromId(e.NodeA);
+            Node b = getNodeFromId(e.NodeB);
+
+            DrawEdge(a.XPosition, a.YPosition, b.XPosition, b.YPosition);
+        }
+
+        // And then draw the nodes of the graph
+        foreach (Node n in _nodes) {
+            DrawNode(n.XPosition, n.YPosition, n.RoomName);
+        }
+    }
+
+    protected async void DrawEdge(int x1, int y1, int x2, int y2)
+    {
+        // Begin a path
+        await this._context.BeginPathAsync();
+        // Draw a line between these two points
+        await this._context.MoveToAsync(scaleTrans(x1), scaleTrans(y1));
+        await this._context.LineToAsync(scaleTrans(x2), scaleTrans(y2));
+        // Finish up
+        await this._context.SetLineWidthAsync(2);
+        await this._context.SetStrokeStyleAsync("#FFFFFFF");
+        await this._context.StrokeAsync();
+    }
+
+    protected async void DrawNode(int x, int y, string text)
+    {
+        // Begin a path
+        await this._context.BeginPathAsync();
+        // Draw a circle
+        await this._context.ArcAsync(scaleTrans(x), scaleTrans(y), 15, 0, 2 * Math.PI, false);
+        await this._context.SetFillStyleAsync("white");
+        await this._context.FillAsync();
+        // Set up line stroke parameters
+        await this._context.SetLineWidthAsync(2);
+        await this._context.SetStrokeStyleAsync("#FFFFFFF");
+        await this._context.StrokeAsync();
+        // Draw the nodes label
+        await this._context.SetFontAsync("15px Arial");
+        await this._context.SetTextBaselineAsync(TextBaseline.Middle);
+        await this._context.SetTextAlignAsync(TextAlign.Center);
+        await this._context.StrokeTextAsync(text, scaleTrans(x), scaleTrans(y));
+    }
+
+    private Node? getNodeFromId(int id) {
+        int last = _nodes.Last().Id;
+
+        for (int i = 0; i < last; i++)
+        {
+            if (_nodes[i].Id == id)
+                return _nodes[i];
+        }
+
+        return null;
+    }
+
+    private int getIdFromName(string name)
+    {
+        Console.WriteLine("My debug output.");
+
+        int last = _nodes.Last().Id;
+
+        for (int i = 0; i < last; i++)
+        {
+            if (_nodes[i].RoomName == name)
+                return _nodes[i].Id;
+        }
+
+        return last;
+    }
+
+    private int scaleTrans(int x) {
+        // Scale the locations of the nodes/edges to the canvas
+        return (10 + x * 8);
+    }
+
+    public class Node
+    {
+        public int Id { get; set; }
+        public string RoomName { get; set; }
+        public int XPosition { get; set; }
+        public int YPosition { get; set; }
+    }
+    
+    public class Edge
+    {
+        public int Id { get; set; }
+        public int NodeA { get; set; }
+        public int NodeB { get; set; }
+    }
+}
